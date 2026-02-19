@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チーム分け</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 30px; background-color: #f0f2f5; }
+        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: inline-block; min-width: 350px; }
+        textarea { width: 90%; height: 120px; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        select { padding: 8px; font-size: 16px; margin-bottom: 15px; }
+        button { background-color: #28a745; color: white; border: none; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #218838; }
+        .result-container { margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+        .team-box { border: 2px solid #007bff; border-radius: 8px; padding: 10px; width: 140px; background-color: #e7f3ff; }
+        .team-title { font-weight: bold; border-bottom: 1px solid #007bff; margin-bottom: 8px; padding-bottom: 5px; color: #007bff; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>チーム分け</h2>
+    
+    <p>1. 名前を改行区切りで入力</p>
+    <textarea id="nameInput"></textarea>
+    
+    <p>2. チーム数を選択</p>
+    <select id="teamCount">
+        <option value="2">2チーム</option>
+        <option value="3">3チーム</option>
+        <option value="4">4チーム</option>
+        <option value="5">5チーム</option>
+    </select>
+    <br>
+    
+    <button onclick="divideTeams()">チーム分け実行！</button>
+
+    <div class="result-container" id="resultArea"></div>
+</div>
+
+<script>
+    function divideTeams() {
+        const text = document.getElementById('nameInput').value;
+        const count = parseInt(document.getElementById('teamCount').value);
+        let names = text.split(/\n/).filter(n => n.trim() !== "");
+
+        if (names.length < count) {
+            alert("人数がチーム数より少ないです！");
+            return;
+        }
+
+        // 1. シャッフル (Fisher-Yates)
+        for (let i = names.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [names[i], names[j]] = [names[j], names[i]];
+        }
+
+        // 2. 空のチーム配列を作成
+        // 例: 3チームなら [[], [], []]
+        const teams = Array.from({ length: count }, () => []);
+
+        // 3. 順番に名前を振り分ける
+        names.forEach((name, index) => {
+            teams[index % count].push(name);
+        });
+
+        // 4. 結果を表示
+        const resultArea = document.getElementById('resultArea');
+        resultArea.innerHTML = ""; // 前の結果をクリア
+
+        teams.forEach((teamMembers, i) => {
+            const box = document.createElement('div');
+            box.className = 'team-box';
+            
+            const title = document.createElement('div');
+            title.className = 'team-title';
+            title.innerText = `チーム ${i + 1}`;
+            
+            box.appendChild(title);
+            box.innerHTML += teamMembers.join('<br>');
+            resultArea.appendChild(box);
+        });
+    }
+</script>
+
+</body>
+</html>
