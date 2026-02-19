@@ -3,85 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チーム分け</title>
+    <title>チーム分けツール</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 30px; background-color: #f0f2f5; }
-        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: inline-block; min-width: 350px; }
-        textarea { width: 90%; height: 120px; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; }
-        select { padding: 8px; font-size: 16px; margin-bottom: 15px; }
-        button { background-color: #28a745; color: white; border: none; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:hover { background-color: #218838; }
-        .result-container { margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
-        .team-box { border: 2px solid #007bff; border-radius: 8px; padding: 10px; width: 140px; background-color: #e7f3ff; }
-        .team-title { font-weight: bold; border-bottom: 1px solid #007bff; margin-bottom: 8px; padding-bottom: 5px; color: #007bff; }
+        body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f8f9fa; }
+        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: inline-block; min-width: 450px; }
+        textarea { width: 90%; height: 100px; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ddd; }
+        .controls { margin-bottom: 20px; text-align: left; display: inline-block; }
+        .control-item { margin: 10px 0; }
+        button { background-color: #007bff; color: white; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        .iteration-block { margin-top: 30px; border-top: 2px solid #eee; padding-top: 15px; }
+        .result-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; }
+        .team-box { border: 1px solid #dee2e6; border-radius: 8px; padding: 10px; width: 130px; background-color: #fff; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+        .team-title { font-weight: bold; color: #495057; border-bottom: 2px solid #007bff; margin-bottom: 8px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>チーム分け</h2>
+    <h2>チーム分けツール</h2>
+    <textarea id="nameInput" placeholder="名前を改行で入力"></textarea>
     
-    <p>1. 名前を改行区切りで入力</p>
-    <textarea id="nameInput"></textarea>
-    
-    <p>2. チーム数を選択</p>
-    <select id="teamCount">
-        <option value="2">2チーム</option>
-        <option value="3">3チーム</option>
-        <option value="4">4チーム</option>
-        <option value="5">5チーム</option>
-    </select>
+    <div class="controls">
+        <div class="control-item">
+            <label>チーム数：</label>
+            <select id="teamCount">
+                <option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+            </select>
+            <label>　回数：</label>
+            <select id="iterCount">
+                <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+            </select>
+        </div>
+        <div class="control-item">
+            <input type="checkbox" id="avoidSameTeam">
+            <label for="avoidSameTeam"><strong>同じ人と同じチームになりにくくする</strong></label>
+        </div>
+    </div>
     <br>
-    
-    <button onclick="divideTeams()">チーム分け実行！</button>
+    <button onclick="generate()">チーム分け開始</button>
 
-    <div class="result-container" id="resultArea"></div>
+    <div id="allResultsArea"></div>
 </div>
 
 <script>
-    function divideTeams() {
+    // 過去の同チーム回数を記録するオブジェクト
+    let historyMap = {};
+
+    function generate() {
         const text = document.getElementById('nameInput').value;
-        const count = parseInt(document.getElementById('teamCount').value);
-        let names = text.split(/\n/).filter(n => n.trim() !== "");
+        const teamCount = parseInt(document.getElementById('teamCount').value);
+        const iterCount = parseInt(document.getElementById('iterCount').value);
+        const avoidMode = document.getElementById('avoidSameTeam').checked;
+        let originalNames = text.split(/\n/).filter(n => n.trim() !== "");
 
-        if (names.length < count) {
-            alert("人数がチーム数より少ないです！");
-            return;
+        if (originalNames.length < teamCount) return alert("人数不足です");
+
+        // 履歴リセット
+        historyMap = {};
+        const allResultsArea = document.getElementById('allResultsArea');
+        allResultsArea.innerHTML = "";
+
+        for (let t = 0; t < iterCount; t++) {
+            let bestTeams = null;
+            let minScore = Infinity;
+
+            // 「避ける」がONの場合、10回試行して最も重複が少ないものを採用
+            const attempts = avoidMode ? 20 : 1;
+            
+            for (let a = 0; a < attempts; a++) {
+                let currentNames = [...originalNames].sort(() => Math.random() - 0.5);
+                let currentTeams = Array.from({ length: teamCount }, () => []);
+                currentNames.forEach((name, i) => currentTeams[i % teamCount].push(name));
+                
+                let score = calculatePenalty(currentTeams);
+                if (score < minScore) {
+                    minScore = score;
+                    bestTeams = currentTeams;
+                }
+                if (score === 0) break; // 重複ゼロなら即確定
+            }
+
+            // 確定したチームを履歴に登録
+            updateHistory(bestTeams);
+            // 画面描画
+            renderTeams(bestTeams, t + 1);
         }
+    }
 
-        // 1. シャッフル (Fisher-Yates)
-        for (let i = names.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [names[i], names[j]] = [names[j], names[i]];
-        }
-
-        // 2. 空のチーム配列を作成
-        // 例: 3チームなら [[], [], []]
-        const teams = Array.from({ length: count }, () => []);
-
-        // 3. 順番に名前を振り分ける
-        names.forEach((name, index) => {
-            teams[index % count].push(name);
+    // 同じチームになったペアにペナルティを与える
+    function calculatePenalty(teams) {
+        let penalty = 0;
+        teams.forEach(members => {
+            for (let i = 0; i < members.length; i++) {
+                for (let j = i + 1; j < members.length; j++) {
+                    const pair = [members[i], members[j]].sort().join('|');
+                    if (historyMap[pair]) penalty += historyMap[pair];
+                }
+            }
         });
+        return penalty;
+    }
 
-        // 4. 結果を表示
-        const resultArea = document.getElementById('resultArea');
-        resultArea.innerHTML = ""; // 前の結果をクリア
-
-        teams.forEach((teamMembers, i) => {
-            const box = document.createElement('div');
-            box.className = 'team-box';
-            
-            const title = document.createElement('div');
-            title.className = 'team-title';
-            title.innerText = `チーム ${i + 1}`;
-            
-            box.appendChild(title);
-            box.innerHTML += teamMembers.join('<br>');
-            resultArea.appendChild(box);
+    // 履歴を更新
+    function updateHistory(teams) {
+        teams.forEach(members => {
+            for (let i = 0; i < members.length; i++) {
+                for (let j = i + 1; j < members.length; j++) {
+                    const pair = [members[i], members[j]].sort().join('|');
+                    historyMap[pair] = (historyMap[pair] || 0) + 1;
+                }
+            }
         });
     }
-</script>
 
+    function renderTeams(teams, num) {
+        const block = document.createElement('div');
+        block.className = 'iteration-block';
+        block.innerHTML = `<div><strong>第 ${num} 回目</strong></div>`;
+        const container = document.createElement('div');
+        container.className = 'result-container';
+
+        teams.forEach((m, i) => {
+            container.innerHTML += `<div class="team-box"><div class="team-title">Team ${i+1}</div>${m.join('<br>')}</div>`;
+        });
+        block.appendChild(container);
+        document.getElementById('allResultsArea').appendChild(block);
+    }
+</script>
 </body>
 </html>
